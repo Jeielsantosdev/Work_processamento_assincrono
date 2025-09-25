@@ -9,14 +9,29 @@ services:
       - "8080:8080"
     depends_on:
       - go_db
-    environment:
-      - DB_HOST=go_db
-      - DB_PORT=5432
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
-      - DB_NAME=go_api
+      - redis
+      - blockchain
+    env_file:
+      - .env
     volumes:
-      - .:/app
+      - ./backend:/app
+    networks:
+      - go_network
+
+  go_worker:
+    build: ./backend
+    container_name: go_worker
+    command: go run worker.go
+    depends_on:
+      - go_db
+      - redis
+      - blockchain
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app
+    networks:
+      - go_network
 
   go_db:
     image: postgres:15
@@ -25,11 +40,37 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: go_api
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     volumes:
       - pg_data:/var/lib/postgresql/data
+    networks:
+      - go_network
+
+  redis:
+    image: redis:7
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - go_network
+
+  blockchain:
+    image: hyperledger/fabric-peer:2.4
+    container_name: blockchain
+    environment:
+      - CORE_PEER_ID=${BLOCKCHAIN_PEER_ID}
+      - CORE_PEER_ADDRESS=${BLOCKCHAIN_HOST}:${BLOCKCHAIN_PORT}
+    ports:
+      - "7051:7051"
+    networks:
+      - go_network
 
 volumes:
   pg_data:
+
+networks:
+  go_network:
+    driver: bridge
