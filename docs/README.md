@@ -1,102 +1,441 @@
-# Sistema de Auditoria Distribuída para Transações Financeiras
+# 🚀 Sistema de Auditoria Distribuída para Transações Financeiras
 
-## 1. Introdução
-
-### 1.1. Propósito
-
-Este documento descreve os requisitos funcionais e não funcionais, regras de negócio, regras de acesso, atores, casos de uso e entidades do sistema **Sistema de Auditoria Distribuída para Transações Financeiras**.
-
-### 1.2. Escopo
-
-O sistema processa transações financeiras de forma assíncrona, registrando cada etapa em uma blockchain privada para auditoria completa, rastreabilidade e compliance financeiro.
-
-### 1.3. Público-Alvo
-
-- Desenvolvedores
-- Auditores financeiros
-- Administradores do sistema
-- Gestores de projetos
+## 📖 Índice
+- [Visão Geral](#visão-geral)
+- [Começando](#começando)
+- [Estrutura do Projeto](#estrutura-do-projeto)
+- [Arquitetura](#arquitetura)
+- [API Endpoints](#api-endpoints)
+- [Desenvolvimento](#desenvolvimento)
+- [Deploy](#deploy)
 
 ---
 
-## 2. Definição de Entidades
+## 📌 Visão Geral
 
-- **Usuário** – pessoa que utiliza o sistema (Cliente, Auditor ou Administrador).
-- **Transação** – operação financeira com origem, destino, valor e status.
-- **Bloco** – registro na blockchain contendo transações e hash anterior.
-- **Notificação** – mensagens de status enviadas ao cliente sobre transações.
+**Sistema de Auditoria Distribuída** processa transações financeiras de forma assíncrona com registro em blockchain privada, garantindo compliance financeiro, rastreabilidade completa e auditoria confiável.
 
----
+### ✨ Características
 
-## 3. Atores
-
-- **Cliente** – envia transações e recebe status.
-- **Auditor** – consulta histórico completo e gera relatórios.
-- **Administrador** – gerencia filas, workers, nós da blockchain e configurações do sistema.
-- **Sistema Externo (Blockchain)** – armazena de forma imutável os registros de transações.
-- **Fila de Processamento** – gerencia tarefas assíncronas.
-
----
-
-## 4. Requisitos Funcionais
-
-- **RF01**: Receber transações via gRPC.
-- **RF02**: Validar dados e gerar ID único da transação.
-- **RF03**: Processar transações de forma assíncrona.
-- **RF04**: Validar regras financeiras (saldo, limites, integridade).
-- **RF05**: Registrar transações na blockchain privada.
-- **RF06**: Consultar histórico de transações.
-- **RF07**: Notificar status das transações.
+✅ Processamento assíncrono com workers  
+✅ Registro imutável em blockchain  
+✅ Autenticação JWT  
+✅ Arquitetura de microserviços  
+✅ Clean Architecture  
+✅ Fila distribuída (RabbitMQ/Redis)  
+✅ PostgreSQL + SQLite  
+✅ Docker Compose pronto  
+✅ Logging centralizado  
+✅ Injeção de dependências  
 
 ---
 
-## 5. Requisitos Não Funcionais
+## 🚀 Começando
 
-- **RNF01**: Processamento paralelo com goroutines.
-- **RNF02**: Escalabilidade para absorver picos de transações.
-- **RNF03**: Comunicação gRPC segura (TLS).
-- **RNF04**: Retry automático em falhas.
-- **RNF05**: Auditoria com histórico imutável.
-- **RNF06**: Alta disponibilidade.
+### Pré-requisitos
+
+- Go 1.22+
+- Docker & Docker Compose
+- PostgreSQL (ou SQLite para dev)
+- RabbitMQ (opcional, pode usar in-memory)
+
+### Instalação Rápida
+
+```bash
+# 1. Clonar repositório
+git clone https://github.com/Jeielsantosdev/Work_processamento_assincrono
+cd Work_processamento_assincrono
+
+# 2. Copiar .env
+cp .env.example .env
+
+# 3. Instalar dependências Go
+go mod download
+
+# 4. Iniciar com Docker Compose
+docker-compose up -d
+
+# 5. API disponível em: http://localhost:8080
+```
+
+### Desenvolvimento Local
+
+```bash
+# Terminal 1 - API
+go run ./cmd/api/main.go
+
+# Terminal 2 - Worker
+go run ./cmd/worker/worker.go
+```
 
 ---
 
-## 6. Regras de Negócio
+## 📂 Estrutura do Projeto
 
-- **RN01**: Cada transação deve ter um ID único e rastreável.
-- **RN02**: Saldo insuficiente impede processamento e registra falha.
-- **RN03**: Apenas usuários autenticados podem enviar transações ou consultar histórico.
-- **RN04**: Transações falhadas devem ser reprocessadas até limite definido.
-- **RN05**: Blockchain deve registrar hash da transação anterior para integridade.
-- **RN06**: Notificações são enviadas somente após validação ou finalização.
+```
+.
+├── cmd/
+│   ├── api/                 # Aplicação API
+│   │   └── main.go
+│   └── worker/              # Processador assíncrono
+│       └── worker.go
+│
+├── internal/
+│   ├── domain/
+│   │   ├── entities/        # Modelos de domínio
+│   │   └── interfaces/      # Contratos
+│   │
+│   ├── usecase/             # Lógica de negócio
+│   ├── infra/               # Implementações infraestrutura
+│   │   ├── repository/      # Persistência
+│   │   ├── http/            # REST API
+│   │   ├── database/        # BD
+│   │   ├── queue/           # Filas
+│   │   ├── blockchain/      # Blockchain
+│   │   └── auth/            # JWT
+│   │
+│   ├── container/           # Injeção dependências
+│   └── worker/              # Workers assíncronos
+│
+├── pkg/
+│   ├── logger/              # Logging
+│   ├── errors/              # Erros
+│   └── crypto/              # Criptografia
+│
+├── config/                  # Configurações
+├── docs/                    # Documentação
+├── docker-compose.yml       # Orquestração containers
+├── dockerfile               # Build
+├── go.mod & go.sum         # Dependências
+└── .env                     # Variáveis ambiente
+```
 
 ---
 
-## 7. Regras de Acesso
+## 🏛️ Arquitetura
 
-- **Cliente**: enviar transações e consultar histórico próprio.
-- **Auditor**: consultar todas as transações e gerar relatórios.
-- **Administrador**: gerenciar filas, workers, nós da blockchain e configurações.
+### Clean Architecture em 4 Camadas
+
+```
+┌─────────────────────────────┐
+│     API REST / Handlers     │ ← Adapters
+├─────────────────────────────┤
+│      Use Cases / Business   │ ← Lógica de Aplicação
+├─────────────────────────────┤
+│    Domain Entities & Rules  │ ← Regras de Negócio
+├─────────────────────────────┤
+│  Database/Queue/Blockchain  │ ← Infraestrutura
+└─────────────────────────────┘
+```
+
+### Fluxo de Requisição
+
+```
+Cliente
+  ↓
+Handler HTTP
+  ↓
+Use Case (ValidationValidate + Business Logic)
+  ↓
+Repository (Save)
+  ↓
+Database
+  ↓
+Queue (Publish for async processing)
+  ↓
+Worker
+  ↓
+Blockchain Service (Record)
+  ↓
+Notification Service (Send)
+```
+
+Veja [ARCHITECTURE.md](ARCHITECTURE.md) para detalhes completos.
 
 ---
 
-## 8. Casos de Uso
+## 🔌 API Endpoints
 
-### UC01 – Enviar Transação
+### Autenticação
 
-**Ator:** Cliente
+```bash
+# Login
+POST /auth/login
+{
+  "email": "user@example.com",
+  "password": "password123"
+}
 
-### UC02 – Receber Status da Transação
+# Response
+{
+  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "user_id": "uuid",
+  "email": "user@example.com",
+  "role": "CLIENT"
+}
+```
 
-**Ator:** Cliente
+### Transações
 
-### UC03 – Auditar Histórico
+```bash
+# Criar transação
+POST /transactions
+{
+  "client_id": "uuid",
+  "source_account": "ACC-001",
+  "destination_account": "ACC-002",
+  "amount": 1000.50,
+  "currency": "BRL",
+  "description": "Payment for services"
+}
 
-**Ator:** Auditor
+# Listar transações do cliente
+GET /transactions?client_id=uuid
 
-### UC04 – Gerenciar Sistema
+# Obter transação específica
+GET /transactions/:id
+```
 
-**Ator:** Administrador
+### Auditoria
+
+```bash
+# Listar logs de auditoria
+GET /audit/logs
+
+# Auditoria de transação específica
+GET /audit/transactions/:id
+```
+
+### Health Check
+
+```bash
+GET /health
+```
+
+---
+
+## 🛠️ Desenvolvimento
+
+### Adicionar Nova Funcionalidade
+
+1. **Criar Entity** em `internal/domain/entities/`
+2. **Definir Interface** em `internal/domain/interfaces/`
+3. **Criar Use Case** em `internal/usecase/`
+4. **Implementar Repository** em `internal/infra/repository/`
+5. **Criar Handler** em `internal/infra/http/handlers/`
+6. **Registrar em Container** em `internal/container/container.go`
+7. **Adicionar Rotas** em `internal/infra/http/routes/`
+
+### Exemplo: Criar Nova Funcionalidade
+
+```go
+// 1. Entity
+type Order struct {
+    ID string
+    // fields...
+}
+
+// 2. Interface
+type OrderRepository interface {
+    Save(ctx context.Context, order *Order) error
+    FindByID(ctx context.Context, id string) (*Order, error)
+}
+
+// 3. Use Case
+type CreateOrderUseCase struct {
+    repo OrderRepository
+}
+
+func (uc *CreateOrderUseCase) Execute(ctx context.Context, input *Input) (*Output, error) {
+    // business logic
+}
+
+// 4. Repository
+type OrderRepositorySQL struct {
+    db *sql.DB
+}
+
+// 5. Handler
+type OrderHandler struct {
+    container *Container
+}
+
+// 6. Container
+orderRepo := repository.NewOrderRepositorySQL(db)
+createOrderUC := usecase.NewCreateOrderUseCase(orderRepo)
+
+// 7. Routes
+router.POST("/orders", orderHandler.CreateOrder)
+```
+
+### Rodando Testes
+
+```bash
+# Todos os testes
+go test ./...
+
+# Com coverage
+go test -cover ./...
+
+# Específico
+go test ./internal/usecase/...
+```
+
+---
+
+## 🐳 Docker & Deploy
+
+### Docker Compose
+
+```bash
+# Iniciar todos os serviços
+docker-compose up -d
+
+# Parar serviços
+docker-compose down
+
+# Ver logs
+docker-compose logs -f api
+docker-compose logs -f worker
+```
+
+### Serviços
+
+- **API**: `http://localhost:8080`
+- **RabbitMQ Management**: `http://localhost:15672`
+- **PostgreSQL**: `localhost:5432`
+- **Redis**: `localhost:6379`
+
+### Variáveis de Ambiente
+
+Edite `.env` para configurar:
+
+```env
+APP_ENV=production
+APP_PORT=:8080
+
+# Database
+DB_DRIVER=postgres
+DB_CONNECTION_STRING=postgres://user:pass@host:5432/db
+
+# Queue
+QUEUE_TYPE=rabbitmq
+QUEUE_CONNECTION_STRING=amqp://guest:guest@rabbitmq:5672/
+
+# JWT
+JWT_SECRET_KEY=your-secret-key-here
+JWT_EXPIRES_IN=24
+
+# Logger
+LOG_LEVEL=info
+```
+
+### Build e Push para Registro
+
+```bash
+# Build
+docker build -t auditoria:1.0 .
+
+# Tag
+docker tag auditoria:1.0 seu-registry/auditoria:1.0
+
+# Push
+docker push seu-registry/auditoria:1.0
+```
+
+---
+
+## 📊 Monitoramento & Logging
+
+### Logs Estruturados
+
+```
+[2024-04-28] INFO: Transaction created | tx_id=uuid | amount=1000
+[2024-04-28] ERROR: Failed to process | tx_id=uuid | error=insufficient_balance
+```
+
+### Métricas
+
+Adicione Prometheus para métricas:
+
+```go
+import "github.com/prometheus/client_golang/prometheus"
+
+transactionCounter := prometheus.NewCounter(
+    prometheus.CounterOpts{
+        Name: "transactions_total",
+    },
+)
+```
+
+---
+
+## 🔐 Segurança
+
+- ✅ JWT para autenticação
+- ✅ Bcrypt para hash de senhas
+- ✅ Validação em camadas
+- ✅ TLS para comunicação
+- ⚠️ TODO: Rate limiting
+- ⚠️ TODO: CORS
+- ⚠️ TODO: HTTPS
+- ⚠️ TODO: Secrets management
+
+---
+
+## 📚 Tecnologias
+
+| Layer | Tecnologia |
+|-------|-----------|
+| **Language** | Go 1.22 |
+| **API** | HTTP REST |
+| **Database** | PostgreSQL / SQLite |
+| **Queue** | RabbitMQ / Redis |
+| **Auth** | JWT |
+| **Crypto** | Bcrypt, SHA256 |
+| **Logging** | Logrus |
+| **Container** | Docker |
+| **Orchestration** | Docker Compose |
+
+---
+
+## 🤝 Contribuindo
+
+1. Fork o projeto
+2. Crie uma branch (`git checkout -b feature/AmazingFeature`)
+3. Commit suas mudanças (`git commit -m 'Add AmazingFeature'`)
+4. Push para a branch (`git push origin feature/AmazingFeature`)
+5. Abra um Pull Request
+
+---
+
+## 📄 Licença
+
+Distribuído sob a licença MIT. Veja `LICENSE` para mais informações.
+
+---
+
+## 👤 Autor
+
+**Jeiel Santos**
+- GitHub: [@Jeielsantosdev](https://github.com/Jeielsantosdev)
+
+---
+
+## 📞 Suporte
+
+Para dúvidas ou sugestões:
+- 📧 Email: jeiel@example.com
+- 💬 Issues: [GitHub Issues](https://github.com/Jeielsantosdev/Work_processamento_assincrono/issues)
+
+---
+
+## 🙏 Agradecimentos
+
+- Clean Architecture - Robert C. Martin
+- Microservices Architecture - Sam Newman
+- Go Community
+
 
 ---
 

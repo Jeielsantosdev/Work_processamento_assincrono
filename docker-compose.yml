@@ -1,22 +1,119 @@
-version: "3.9"
+version: '3.8'
 
 services:
-  go_api:
-    build: .
-    container_name: go_api
-    restart: unless-stopped
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: auditoria_postgres
+    environment:
+      POSTGRES_USER: auditoria
+      POSTGRES_PASSWORD: auditoria_password
+      POSTGRES_DB: auditoria
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auditoria"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - auditoria_network
+
+  # RabbitMQ Message Queue
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: auditoria_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"    # AMQP port
+      - "15672:15672"  # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - auditoria_network
+
+  # Redis Cache/Queue
+  redis:
+    image: redis:7-alpine
+    container_name: auditoria_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - auditoria_network
+
+  # API Server
+  api:
+    build:
+      context: .
+      dockerfile: dockerfile
+      target: api
+    container_name: auditoria_api
+    environment:
+      APP_ENV: production
+      APP_PORT: ":8080"
+      DB_DRIVER: postgres
+      DB_CONNECTION_STRING: "user=auditoria password=auditoria_password host=postgres port=5432 dbname=auditoria sslmode=disable"
+      QUEUE_TYPE: rabbitmq
+      QUEUE_CONNECTION_STRING: "amqp://guest:guest@rabbitmq:5672/"
+      JWT_SECRET_KEY: "your-secret-key-change-in-production"
+      LOG_LEVEL: info
     ports:
       - "8080:8080"
     depends_on:
-      - go_db
-      - redis
-      - blockchain
-    env_file:
-      - .env
-    volumes:
-      - ./backend:/app
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
-      - go_network
+      - auditoria_network
+
+  # Worker Service
+  worker:
+    build:
+      context: .
+      dockerfile: dockerfile
+      target: worker
+    container_name: auditoria_worker
+    environment:
+      APP_ENV: production
+      DB_DRIVER: postgres
+      DB_CONNECTION_STRING: "user=auditoria password=auditoria_password host=postgres port=5432 dbname=auditoria sslmode=disable"
+      QUEUE_TYPE: rabbitmq
+      QUEUE_CONNECTION_STRING: "amqp://guest:guest@rabbitmq:5672/"
+      JWT_SECRET_KEY: "your-secret-key-change-in-production"
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - auditoria_network
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+  redis_data:
+
+networks:
+  auditoria_network:
+    driver: bridge
 
   go_worker:
     build: ./backend
