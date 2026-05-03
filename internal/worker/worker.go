@@ -65,10 +65,31 @@ func (w *Worker) processTransactionsWorker(workerID int, transactionChan <-chan 
 			w.logger.Info(fmt.Sprintf("Worker %d processing transaction %s", workerID, tx.ID))
 
 			// TODO: Chamar ProcessTransactionUC.Execute()
-			// Por enquanto, apenas log
-			tx.MarkAsCompleted(tx.ID)
-
-			w.logger.Info(fmt.Sprintf("Worker %d completed transaction %s", workerID, tx.ID))
+			// Chamar use case responsável por processar a transação
+			if w.container.ProcessTransactionUC != nil {
+				if err := w.container.ProcessTransactionUC.Execute(w.ctx, tx.ID); err != nil {
+					w.logger.Error("Failed to process transaction", err, "tx_id", tx.ID)
+					// Tentativa de retry: incrementar contador e republicar
+					tx.IncrementRetry()
+					if pubErr := w.container.QueueService.PublishTransaction(w.ctx, tx); pubErr != nil {
+						w.logger.Error("Failed to requeue transaction", pubErr, "tx_id", tx.ID)
+					}
+					// Acknowledge original message to remove it from the queue
+					if ackErr := w.container.QueueService.AcknowledgeMessage(w.ctx, tx.ID); ackErr != nil {
+						w.logger.Error("Failed to acknowledge original message", ackErr, "tx_id", tx.ID)
+					}
+					continue
+				}
+				// Success: acknowledge message
+				if ackErr := w.container.QueueService.AcknowledgeMessage(w.ctx, tx.ID); ackErr != nil {
+					w.logger.Error("Failed to acknowledge message", ackErr, "tx_id", tx.ID)
+				}
+				w.logger.Info(fmt.Sprintf("Worker %d completed transaction %s", workerID, tx.ID))
+			} else {
+				// Fallback: marcar como completo para evitar bloqueio
+				tx.MarkAsCompleted(tx.ID)
+				w.logger.Warn("ProcessTransactionUC is not configured; marked transaction completed", "tx_id", tx.ID)
+			}
 		}
 	}
 }
